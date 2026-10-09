@@ -1,0 +1,1 @@
+- [Minecraft smoke tests](minecraft-smoke-tests.md) — offline servers should stay loopback-only; flat presets need explicit settings and Mineflayer may hide NBT names.
