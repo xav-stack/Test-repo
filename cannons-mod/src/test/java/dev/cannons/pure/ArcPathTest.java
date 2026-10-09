@@ -1,0 +1,53 @@
+package dev.cannons.pure;
+
+import dev.cannons.pure.geometry.ArcPath;
+import dev.cannons.pure.geometry.Vec3;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ArcPathTest {
+    @Test
+    void endpointsAndApexMatchTheSpecifiedCurve() {
+        Vec3 start = new Vec3(0, 2, 0);
+        Vec3 end = new Vec3(40, 12, 0);
+        ArcPath path = new ArcPath(start, end, 0.25);
+
+        assertEquals(start, path.pointAtParameter(0));
+        assertEquals(end, path.pointAtParameter(1));
+        assertEquals(0.25 * start.distanceTo(end), path.height(), 1e-12);
+        assertEquals((start.y() + end.y()) / 2 + path.height(),
+                path.pointAtParameter(0.5).y(), 1e-12);
+    }
+
+    @Test
+    void straightUpAndDownPathsRemainWellDefined() {
+        ArcPath up = new ArcPath(new Vec3(0, 0, 0), new Vec3(0, 30, 0), 0.25);
+        ArcPath down = new ArcPath(new Vec3(0, 30, 0), new Vec3(0, 0, 0), 0.25);
+
+        assertEquals(new Vec3(0, 30, 0), up.pointAtParameter(1));
+        assertEquals(new Vec3(0, 0, 0), down.pointAtParameter(1));
+        assertEquals(22.5, up.pointAtParameter(0.5).y(), 1e-12);
+        assertEquals(22.5, down.pointAtParameter(0.5).y(), 1e-12);
+    }
+
+    @Test
+    void zeroLengthPathIsDegenerate() {
+        ArcPath path = new ArcPath(new Vec3(1, 1, 1), new Vec3(1, 1, 1), 0.25);
+        assertTrue(path.isDegenerate());
+        assertEquals(0, path.totalLength());
+        assertEquals(path.start(), path.pointAtDistance(50));
+    }
+
+    @Test
+    void arcLengthSteppingKeepsLongArcDeltasWithinTwoPercent() {
+        ArcPath path = new ArcPath(new Vec3(0, 0, 0), new Vec3(70, 10, 0), 0.25);
+        assertTrue(path.totalLength() >= 50);
+        Vec3 previous = path.pointAtDistance(0);
+        for (double distance = 1.5; distance < path.totalLength(); distance += 1.5) {
+            Vec3 current = path.pointAtDistance(distance);
+            assertEquals(1.5, previous.distanceTo(current), 0.03);
+            previous = current;
+        }
+    }
+}

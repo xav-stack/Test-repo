@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "cannons",
+  "version": "${version}",
+  "name": "Cannons",
+  "description": "A server-side-only Fabric mod that turns marked barrels into remotely aimed TNT cannons.",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "dev.cannons.CannonsMod"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "cannons.mixins.json",
+      "environment": "server"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": "1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}

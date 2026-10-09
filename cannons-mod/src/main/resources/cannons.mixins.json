@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.cannons.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "server": [
+    "BarrelBlockMixin",
+    "BarrelBlockEntityMixin",
+    "HopperBlockEntityMixin",
+    "BlockDropsMixin",
+    "ShapedRecipeMixin",
+    "EntityMixin",
+    "TntEntityMixin",
+    "DamageTrackerMixin",
+    "DisplayEntityAccessor",
+    "TextDisplayEntityAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

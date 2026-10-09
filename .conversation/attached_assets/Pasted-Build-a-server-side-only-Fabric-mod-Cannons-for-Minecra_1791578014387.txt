@@ -1,0 +1,111 @@
+Build a server-side-only Fabric mod, "Cannons", for Minecraft 1.20.1. Follow this specification exactly. Where it is ambiguous, or you cannot verify a vanilla behaviour, do not guess: choose the conservative option and list it under "Open questions" in the README.
+
+0. TERMS
+- Cannon: a registered barrel. Selection: the cannons a command applies to. Target: coordinates stored on a cannon by /ct or /cta. Aim point: target plus a random offset, new for every shot. Muzzle: (cx+0.5, cy+1.0, cz+0.5), the feet position of the projectile entity in the block space above the cannon. Bound: see section 3. Starter: the player who most recently started a cannon firing.
+- Projectile: a primed TNT entity, bounding box 0.98 cube.
+
+1. ENVIRONMENT AND DELIVERABLES
+- Minecraft 1.20.1, Fabric Loader, Fabric API for 1.20.1, Yarn mappings (1.20.1), Java 17, Gradle with Fabric Loom. Look up valid versions from Fabric's metadata and pin them. If the network is blocked, say so and stop; do not guess versions.
+- Every Minecraft/Fabric class, method and vanilla behaviour named in this prompt is from memory. Run ./gradlew genSources and confirm each against the 1.20.1 Yarn sources before relying on it. Record any differences in README "Implementation notes".
+- fabric.mod.json: id "cannons", "environment": "server", a "main" ModInitializer. Mixin config: every mixin in the "server" array, "required": true, injectors defaultRequire 1, compatibilityLevel JAVA_17. Guard all logic with `world instanceof ServerWorld`.
+- Server-side only. Vanilla clients with no mods or resource packs must be able to join and see every feature. Register no custom blocks, items, entities, recipe serializers, screen types, packets or registries. Use only: barrel, TNT, primed TNT entity, text display entity, ScreenHandlerType.GENERIC_9X3, vanilla recipe type crafting_shaped.
+- Replit: do not run a long-lived Minecraft server. An optional smoke test with ./gradlew runServer is allowed if resources permit. Do not set eula=true on the user's behalf; if a smoke test needs it, stop and tell the user.
+- Deliver: a project that builds with ./gradlew build into build/libs/*.jar; tests runnable with ./gradlew test; a README (Java 17 requirement, install steps: Fabric server + Fabric API + the jar, config file, commands, known limitations, Open questions).
+- Pure logic (arc maths, arc-length stepping, sphere sampling, sweep logic over a CollisionQuery interface, RPM accumulator, chunk-set calculation, ticket reference counting, battery logic, slot rules, name matching, command tree built generically over the source type S, notification throttling) must live in packages that import nothing from net.minecraft. Add a test that scans those packages' sources and fails on any "net.minecraft" import.
+
+2. CANNON ITEM, BLOCK, LABEL, RECIPE
+- Item: a barrel ItemStack. Custom name "Cannon", Formatting.DARK_PURPLE, italic false. Enchantments [{id:"minecraft:unbreaking",lvl:1}] with HideFlags 1 (glint, no tooltip). Root NBT byte CannonItem:1b. Stack size as vanilla barrel.
+- Placement: a mixin on BarrelBlock.onPlaced registers the position when the placed stack has CannonItem. Keep vanilla's behaviour of copying the item name onto the block entity (it becomes the GUI title). Ordinary barrels, and barrels copied by /clone, are ordinary barrels and unaffected.
+- Label: one text display entity per cannon, text "cannon" (lower-case, intentional), see_through false, billboard center, default background, centred horizontally at y+1.25 above the cannon's base, scoreboard tag "cannons_label", invulnerable. It must hide behind blocks like a crouching player's name tag.
+- Recipe: data file data/cannons/recipes/cannon.json, type minecraft:crafting_shaped, pattern ["ICI","ITI","TOT"], I=iron_ingot, C=crossbow (any durability/enchantments), T=tnt, O=obsidian, result minecraft:barrel x1. A mixin on ShapedRecipe.craft replaces the result with the cannon item when the recipe id is cannons:cannon. The result slot is computed server-side, so players see the real cannon; the recipe book and ghost recipe show a plain barrel (document this). Unlock the recipe for each player on join so it works under doLimitedCrafting. Fallback if craft() is not the right hook: intercept 3x3 result calculation in CraftingScreenHandler.updateResult.
+- Admin item: /cannongive (section 6).
+
+3. INVENTORY AND AUTOMATION (registered cannons only; all other barrels stay vanilla)
+- Opening: a mixin on BarrelBlockEntity.createScreenHandler returns a custom handler for registered cannons. This keeps vanilla open/close behaviour (lid, sound, viewer count, sneaking rules, spectators). The handler uses GENERIC_9X3 with custom Slot subclasses overriding canInsert. Enforce the rules for click, shift-click, drag, number-key swap, offhand swap and double-click collect. The server is authoritative; rely on the standard resync for client prediction.
+- Slots 0-17: items of type TNT, with or without NBT or a name. All else rejected.
+- Slots 18-25: any item that has a custom name. All else rejected.
+- Slot 26: emeralds only. RPM = count, with 0 -> 1 and anything above 60 -> 60.
+- Bound: a player is bound to a cannon if any slot 18-25 holds an item with a custom name whose string equals the player's username exactly (case-sensitive). There is no automatic binding.
+- Automation: BlockEntity-level checks apply only when (world, pos) is registered. isValid returns true only for slot < 18 with TNT. Hopper-block and dropper insertion goes through HopperBlockEntity.transfer, which consults isValid. Hoppers and hopper minecarts must not extract from slots 18-26; extraction from slots 0-17 is vanilla. Dispensers do not insert into containers, so nothing is needed for them. Do not handle pistons: vanilla refuses to move block entities.
+- Anyone can open and break a cannon. Only bound players can target and fire it.
+
+4. REGISTRY, LIFECYCLE, PERSISTENCE
+- CannonId = (dimension key, BlockPos). Registry: a PersistentState per ServerWorld holding positions (indexed by chunk) and label UUIDs. Batteries: one global PersistentState keyed by player UUID -> battery name -> set of CannonId.
+- Removal funnel: a mixin on BarrelBlock.onStateReplaced, when the new block is not a barrel, unregisters the cannon, removes it from every battery, discards its label, stops its firing, releases its tickets, and adds its id to a recentlyRemoved set (dimension,pos) that is cleared at the end of the tick. This covers breaking, explosions, /setblock and /fill.
+- Drops: a mixin on Block.getDroppedStacks replaces vanilla loot for any position that is registered OR in recentlyRemoved (vanilla player breaks remove the block before computing drops; explosions compute drops before removal). The replacement is one fresh cannon item with no contents. Vanilla BarrelBlock.onStateReplaced already scatters the inventory as separate item entities; keep that. Do not also allow vanilla loot, because it would produce a barrel named "Cannon" without the identifying tag. Creative mode follows vanilla: no item drop, contents spill.
+- On ServerChunkEvents.CHUNK_LOAD, validate that every registered position in that chunk is still a barrel; otherwise unregister quietly.
+- Labels, invariant: exactly one label per registered cannon in a loaded chunk, and no label without a cannon.
+  - ServerEntityEvents.ENTITY_LOAD: a tagged label with no matching cannon is discarded; a duplicate for the same cannon is discarded; otherwise adopt its UUID.
+  - ServerEntityEvents.ENTITY_UNLOAD with a removal reason of killed/discarded: recreate the label next tick if the cannon still exists and its chunk is loaded.
+  - Do not rely on CHUNK_LOAD for entities; they load separately.
+- Projectiles are never persisted: a mixin makes tagged projectiles return false from shouldSave; tagged projectiles found on ENTITY_LOAD are discarded; on SERVER_STOPPING and world unload all projectiles are discarded and all tickets released.
+- Persisted: registry, label UUIDs, batteries. Not persisted: targets, firing state, tickets, projectiles.
+
+5. BATTERIES
+- Per player. Names match [A-Za-z_]{1,16}, case-sensitive. Validate with a regex in the command executor; StringArgumentType.word() alone accepts digits and punctuation.
+- /cannonbattery (alias /cb) add <name> and remove <name>, used while looking at a cannon the player is bound to. add creates the battery on first use. Empty batteries are deleted automatically. /cb list shows the player's batteries and member counts.
+- A cannon may be in several batteries. Membership is not pruned when a player is unbound; it is only skipped at use time. Membership is removed when the cannon is removed.
+- Selection for /cta and /cfa: with a battery name, its members; without one, every cannon the player is bound to, in any dimension. Only loaded cannons are acted on. Members that are unloaded or no longer bound are skipped and counted in the feedback. An unknown battery name is an error.
+
+6. COMMANDS (Brigadier; all except /cannongive require a player source, otherwise "Players only")
+- "Looking at a cannon": a raycast from the player's eyes with RaycastContext.ShapeType.OUTLINE, FluidHandling.NONE, maximum 5 blocks (config). The first block hit must be a registered cannon the player is bound to. Any other block with an outline shape (grass included) blocks the line, as with the vanilla crosshair.
+- /cannontarget (/ct) <x> <y> <z>; /cannontargetall (/cta) [battery] <x> <y> <z>. Register /cta as two branches (x y z) and (battery x y z); Brigadier separates them by argument count. Use DoubleArgumentType for coordinates, never Vec3Argument, so ~ and ^ are not accepted.
+- Coordinates are exact positions (no centring). Reject non-finite values (a 400-digit literal parses to Infinity), positions outside the executing player's world border, and Y outside [bottomY, topY). The shot-time aim point is clamped to the same bounds.
+- Dimensions: /ct acts on the cannon the player is looking at, which is in the player's dimension. /cta interprets the coordinates in the player's dimension and skips cannons in other dimensions, counting them in the feedback. /cf needs no dimension rule. /cfa has no dimension restriction; each cannon uses its own stored target.
+- /cannonfire (/cf): while looking at a bound cannon, toggle it: start if idle, stop if firing. Starting requires a target and at least 1 TNT.
+- /cannonfireall (/cfa) [battery]: let F be the firing cannons in the selection. If F is non-empty, stop only F. Otherwise start every selected cannon that has a target and TNT. Report counts.
+- Any bound player may start or stop a cannon. Record the starter on each start.
+- /cannongive [player]: op level 2. From the console the player argument is required.
+- Every command-time refusal sends a clear chat message: not bound, not looking at a cannon, no target, no TNT, unknown battery, invalid coordinates, dimension mismatch, invalid battery name.
+
+7. FIRING
+- Per-cannon state: firing flag, starter UUID, integer progress. Continuous fire stops when: the toggle command is used, the cannon has no TNT, or the cannon is removed. It does not depend on the starter being online or bound.
+- Rate: each server tick for a firing cannon: if progress < 1200 then progress += RPM (read from the emerald slot every tick, so changes apply live); if progress >= 1200 attempt a shot and, once the attempt is resolved, progress -= 1200. Starting sets progress = 1200 so the first shot is immediate. Progress does not accumulate while a shot is due and waiting. At most one shot per tick. Shots through tick N after start = 1 + floor(N*RPM/1200).
+- Shot sequence:
+  1. If there is no TNT, stop firing and notify.
+  2. Aim point = target + offset, uniformly distributed in volume inside a sphere of radius 8 (injectable RNG), new every shot, clamped to world bounds.
+  3. Build the arc from muzzle to aim point (below). If the arc length is 0, refuse as degenerate.
+  4. Pre-simulate only the part of the arc whose points are within 20 blocks (Euclidean, from the cannon block's centre) of the cannon, using the same box sweep as flight. A collision at a distance of 20 or less, including an initial overlap at the muzzle, counts as blocked, even if the blocking block is the target. Examples: shooting straight down hits the barrel, so it is refused; a solid block above the muzzle is refused. A refusal consumes no TNT and produces no effects, firing continues, and progress is still reduced by 1200.
+  5. If the chunks needed for that check are not loaded, the shot waits (see section 8). Never force a synchronous chunk load.
+  6. Otherwise consume 1 TNT (lowest slot index first), play the launch effects and spawn the projectile.
+- Launch effects: the vanilla explosion-emitter particle and the vanilla TNT explosion sound (ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS), centred on the cannon block. No block or entity damage.
+- Arc: P(u) = lerp(muzzle, aimPoint, u) + (0, 4*H*u*(1-u), 0), u in [0,1], H = arcHeightRatio * straight-line distance. Speed is a constant 30 blocks/second measured along the arc. Integrate arc length numerically, parameterise by arc length, and advance 1.5 blocks per tick. Gravity is not simulated. There is no range limit.
+- Projectile entity:
+  - Primed TNT with tag "cannons_projectile", noGravity, velocity (0,0,0), fuse 32767 (the client counts the fuse down locally and discards at 0), shouldSave false, and the starter as the causing entity if online.
+  - A mixin cancels the server-side vanilla TntEntity.tick for tagged entities. The mod drives them each tick.
+  - Each tick, advance in sub-steps of at most 0.25 blocks. After each sub-step test whether the 0.98 bounding box intersects any block collision shape (fluids ignored). On intersection, step back to the last free position and detonate there ("the moment it stops moving"). If the end of the arc is reached with no hit, detonate at the aim point.
+  - Smoothness: vanilla TNT tracks entity position only every 10 ticks, so force a position update to all tracking players every tick (set velocityDirty each tick, or send position/relative-move packets via PlayerLookup.tracking). Verify which works. The 1.5-block per-tick delta fits relative-move packets. Do not teleport in large steps.
+  - Explosion: world.createExplosion(projectile, x, projectile.getBodyY(0.0625), z, explosionPower, World.ExplosionSourceType.TNT), then discard the entity. It breaks blocks and damages entities as vanilla TNT does.
+  - If the next chunk on the path is not loaded, hold position until it is, up to chunkWaitTimeoutTicks; then discard the projectile without exploding and log a warning. A waiting shot is skipped after the same timeout, without consuming TNT.
+- Retargeting while firing takes effect on the next shot.
+
+8. CHUNK LOADING
+- A custom non-expiring ChunkTicketType added through ServerChunkManager.addTicket at the same level as vanilla /forceload (radius 2, entity-ticking; verify). Keep a reference count per (dimension, chunk): add the vanilla ticket on 0->1 and remove it on 1->0. There is no refresh; tickets are released explicitly.
+- Cannon corridor: every chunk intersecting the horizontal segment from the muzzle's XZ to the target's XZ, thickened by P = offsetRadius + blastReach, where blastReach = ceil(2 * explosionPower) = 8. The height bulge is vertical only and does not affect the footprint. The corridor includes the cannon's own chunk and the target's chunk.
+- A cannon holds its corridor while hasShotDueWithin(90 s) is true. This is a pure function: firing && tnt > 0 && ticksUntilNextShot <= 1800, where ticksUntilNextShot = 0 if progress >= 1200, otherwise ceil((1200 - progress) / RPM). With RPM >= 1 the interval is at most 60 s, so this equals "firing with TNT remaining"; keep the function so the behaviour stays correct if the constants change.
+- Acquire before the first shot, diff on retarget, release when the function turns false, on removal and on server stop.
+- A projectile in flight also holds the chunks of its exact arc padded by blastReach until it detonates, independent of its cannon.
+- Sweeps and pre-simulation use non-loading chunk lookups. An unloaded chunk means "not ready", never a synchronous load.
+- Range is not capped. Far targets produce long corridors by design.
+
+9. NOTIFICATIONS
+- Command-time results and refusals: chat to the executor.
+- Out of TNT: chat to the starter if online, batched per starter per tick ("N cannon(s) out of TNT", with coordinates when N = 1).
+- Blocked shots during continuous fire: action bar to the starter, at most once per noticeThrottleSeconds per starter, aggregating the blocked count since the last message.
+- Starter offline: no message.
+
+10. CONFIGURATION (config/cannons.json, Gson, written with defaults on first run, values validated and clamped with logged warnings)
+projectileSpeedBlocksPerSecond 30; refusalRadiusBlocks 20; offsetRadiusBlocks 8; chunkRetentionSeconds 90; explosionPower 4.0; lookRangeBlocks 5; maxRpm 60; arcHeightRatio 0.25; collisionSubstepBlocks 0.25; chunkWaitTimeoutTicks 200; noticeThrottleSeconds 1; batteryNameMaxLength 16.
+Not configurable (fixed behaviour): case-sensitive name matching, cannon colour, label text, slot layout.
+
+11. TESTS (JUnit, pure code only, seeded RNG, no flaky tests)
+- Arc: endpoints exact; apex height = ratio * distance; straight-up shot; straight-down shot; zero-length arc is degenerate; consecutive per-tick positions are 1.5 blocks apart along the arc, within 2% for arcs of length at least 50.
+- Sphere sampling: seed 12345, 100,000 samples; all within radius 8; fraction within radius 4 is 0.125 +/- 0.01; each axis mean within +/- 0.05.
+- Refusal, using a fake CollisionQuery: obstacle at 19 blocks is refused; at 21 is not; target block within 20 is refused; initial overlap is refused; downward shot is refused.
+- RPM: for every RPM 1..60, shots through tick N equal 1 + floor(N*RPM/1200), with no drift over 100,000 ticks; live RPM change; clamping (0 -> 1, 61-64 -> 60); no accumulation while a shot waits.
+- Chunk set: capsule covers both endpoints and the padding; refcount (acquire twice, release once keeps the ticket; the second release removes it); retarget diff; hasShotDueWithin at the boundaries (RPM 1 with progress 0, TNT 0, not firing).
+- Batteries: add/remove, auto-delete when empty, name validation (regex, length, case), unbound members skipped, no pruning on unbind, cannon removal clears memberships.
+- Commands, using a Brigadier CommandDispatcher with a stub source: /cta parses "1 2 3" and "name 1 2 3"; "~ 1 2" and "1 2" fail; non-finite values are rejected by validation.
+- Name binding is case-sensitive and ignores unnamed items. Slot rules accept and reject the expected item kinds.
+- Notification throttle and aggregation.
+- Source-scan test for forbidden net.minecraft imports in pure packages.
