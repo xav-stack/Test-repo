@@ -20,3 +20,9 @@ Mineflayer's `Item.displayName` can show the vanilla registry label (for example
 **Why:** Mineflayer's registry label is not proof that the server-side custom name or marker tag is missing.
 
 **How to apply:** Inspect item NBT or verify the mod's actual binding and command behavior rather than relying on `displayName`.
+
+Repeated restarts of the persisted smoke-test world stalled during spawn preparation, including with C2ME temporarily excluded; an isolated fresh copy with the full mod set started and completed the impact test.
+
+**Why:** Reusing a saved test world can make a server-startup stall look like a mod failure and block follow-up verification.
+
+**How to apply:** Preserve the original test world and use an isolated fresh copy when repeating instrumented shots.
