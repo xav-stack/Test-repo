@@ -20,7 +20,6 @@ class CannonsConfigTest {
         config.chunkWaitTimeoutTicks = 0;
         config.noticeThrottleSeconds = Integer.MAX_VALUE;
         config.batteryNameMaxLength = 0;
-        config.maxShotRangeBlocks = 0;
         config.validate();
 
         assertEquals(0.1, config.projectileSpeedBlocksPerSecond);
@@ -35,7 +34,6 @@ class CannonsConfigTest {
         assertEquals(1, config.chunkWaitTimeoutTicks);
         assertEquals(60, config.noticeThrottleSeconds);
         assertEquals(1, config.batteryNameMaxLength);
-        assertEquals(1000, config.maxShotRangeBlocks);
     }
 
     @Test
@@ -53,7 +51,6 @@ class CannonsConfigTest {
         config.chunkWaitTimeoutTicks = 1200;
         config.noticeThrottleSeconds = 60;
         config.batteryNameMaxLength = 16;
-        config.maxShotRangeBlocks = 1000;
         config.validate();
 
         assertEquals(1000, config.projectileSpeedBlocksPerSecond);
@@ -68,14 +65,5 @@ class CannonsConfigTest {
         assertEquals(1200, config.chunkWaitTimeoutTicks);
         assertEquals(60, config.noticeThrottleSeconds);
         assertEquals(16, config.batteryNameMaxLength);
-        assertEquals(1000, config.maxShotRangeBlocks);
-    }
-
-    @Test
-    void maximumShotRangeHasUnlimitedSentinel() {
-        CannonsConfig config = new CannonsConfig();
-        config.maxShotRangeBlocks = -1;
-        config.validate();
-        assertEquals(-1, config.maxShotRangeBlocks);
     }
 }

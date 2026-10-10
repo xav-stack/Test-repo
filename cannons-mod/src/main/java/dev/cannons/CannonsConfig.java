@@ -28,7 +28,6 @@ public final class CannonsConfig {
     public int chunkWaitTimeoutTicks = 200;
     public int noticeThrottleSeconds = 1;
     public int batteryNameMaxLength = 16;
-    public int maxShotRangeBlocks = 1000;
 
     public static CannonsConfig load() {
         CannonsConfig config = new CannonsConfig();
@@ -64,12 +63,6 @@ public final class CannonsConfig {
         chunkWaitTimeoutTicks = clamp("chunkWaitTimeoutTicks", chunkWaitTimeoutTicks, 1, 1200);
         noticeThrottleSeconds = clamp("noticeThrottleSeconds", noticeThrottleSeconds, 0, 60);
         batteryNameMaxLength = clamp("batteryNameMaxLength", batteryNameMaxLength, 1, 16);
-        if (maxShotRangeBlocks != dev.cannons.pure.geometry.ShotRange.UNLIMITED
-                && maxShotRangeBlocks < 1) {
-            LOGGER.warn("Config value maxShotRangeBlocks={} is invalid; using default 1000",
-                    maxShotRangeBlocks);
-            maxShotRangeBlocks = 1000;
-        }
     }
 
     private static double clamp(String name, double value, double min, double max) {

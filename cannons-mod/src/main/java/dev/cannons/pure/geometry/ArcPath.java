@@ -85,79 +85,7 @@ public final class ArcPath {
         return lengths[lower] + (lengths[lower + 1] - lengths[lower]) * fraction;
     }
 
-    /**
-     * Returns the one interval in which this concave-down arc is above the given height,
-     * or {@code null} if it never rises above it. Endpoints are the exact arc intersections.
-     */
-    public AboveHeightInterval intervalAbove(double yLimit) {
-        if (!Double.isFinite(yLimit)) {
-            throw new IllegalArgumentException("height limit must be finite");
-        }
-        double slope = end.y() - start.y();
-        double peakParameter;
-        if (height == 0) {
-            peakParameter = slope >= 0 ? 1 : 0;
-        } else {
-            peakParameter = clamp01((slope + 4 * height) / (8 * height));
-        }
-        if (pointAtParameter(peakParameter).y() <= yLimit) {
-            return null;
-        }
-
-        double startParameter = start.y() > yLimit
-                ? 0 : risingIntersection(0, peakParameter, yLimit);
-        double endParameter = end.y() > yLimit
-                ? 1 : fallingIntersection(peakParameter, 1, yLimit);
-        double startDistance = distanceAtParameter(startParameter);
-        double endDistance = distanceAtParameter(endParameter);
-        return new AboveHeightInterval(
-                startParameter,
-                endParameter,
-                startDistance,
-                endDistance,
-                pointAtParameter(startParameter),
-                pointAtParameter(endParameter));
-    }
-
-    private double risingIntersection(double below, double above, double yLimit) {
-        for (int i = 0; i < 64; i++) {
-            double middle = (below + above) * 0.5;
-            if (pointAtParameter(middle).y() > yLimit) {
-                above = middle;
-            } else {
-                below = middle;
-            }
-        }
-        return (below + above) * 0.5;
-    }
-
-    private double fallingIntersection(double above, double below, double yLimit) {
-        for (int i = 0; i < 64; i++) {
-            double middle = (above + below) * 0.5;
-            if (pointAtParameter(middle).y() > yLimit) {
-                above = middle;
-            } else {
-                below = middle;
-            }
-        }
-        return (above + below) * 0.5;
-    }
-
-    private static double clamp01(double value) {
-        return Math.max(0, Math.min(1, value));
-    }
-
     public Vec3 pointAtFraction(double fraction) {
         return pointAtDistance(Math.max(0, Math.min(1, fraction)) * totalLength);
-    }
-
-    public record AboveHeightInterval(
-            double startParameter,
-            double endParameter,
-            double startDistance,
-            double endDistance,
-            Vec3 startPoint,
-            Vec3 endPoint
-    ) {
     }
 }
