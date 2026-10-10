@@ -38,4 +38,24 @@ class ChunkLogicTest {
         assertEquals(0, refs.release(key));
         assertEquals(List.of(key + ":true", key + ":false"), transitions);
     }
+
+    @Test
+    void clearingTicketsReleasesEachLiveChunkOnceAndCanBeRepeated() {
+        List<String> transitions = new ArrayList<>();
+        TicketReferenceCounter<ChunkPos> refs = new TicketReferenceCounter<>(
+                (chunk, acquire) -> transitions.add(chunk + ":" + acquire));
+        ChunkPos first = new ChunkPos(-2, 3);
+        ChunkPos second = new ChunkPos(7, -9);
+        refs.acquire(first);
+        refs.acquire(first);
+        refs.acquire(second);
+        refs.clear();
+        refs.clear();
+        assertEquals(0, refs.count(first));
+        assertEquals(0, refs.count(second));
+        assertEquals(4, transitions.size());
+        assertEquals(Set.of(first + ":true", second + ":true",
+                        first + ":false", second + ":false"),
+                Set.copyOf(transitions));
+    }
 }

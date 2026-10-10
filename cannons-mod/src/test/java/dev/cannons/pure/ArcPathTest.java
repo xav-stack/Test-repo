@@ -50,4 +50,28 @@ class ArcPathTest {
             previous = current;
         }
     }
+
+    @Test
+    void parameterDistanceMappingIsMonotonicAndClamped() {
+        ArcPath path = new ArcPath(new Vec3(-20, 3, 4), new Vec3(90, -7, -16), 0.75);
+        assertEquals(0, path.distanceAtParameter(-2));
+        assertEquals(path.totalLength(), path.distanceAtParameter(2));
+        double previous = -1;
+        for (int i = 0; i <= 10_000; i++) {
+            double distance = path.distanceAtParameter(i / 10_000.0);
+            assertTrue(distance >= previous);
+            assertTrue(distance <= path.totalLength());
+            previous = distance;
+        }
+        assertEquals(path.totalLength(), path.distanceAtParameter(1));
+    }
+
+    @Test
+    void distanceQueriesClampNegativeAndOversizedFractions() {
+        ArcPath path = new ArcPath(new Vec3(1, 2, 3), new Vec3(40, 8, -9), 0.25);
+        assertEquals(path.start(), path.pointAtDistance(-1));
+        assertEquals(path.end(), path.pointAtDistance(path.totalLength() + 1));
+        assertEquals(path.start(), path.pointAtFraction(-1));
+        assertEquals(path.end(), path.pointAtFraction(2));
+    }
 }

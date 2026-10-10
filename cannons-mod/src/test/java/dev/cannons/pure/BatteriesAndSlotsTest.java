@@ -65,4 +65,64 @@ class BatteriesAndSlotsTest {
         inventory.set(25, new SlotRules.Item(SlotRules.ItemKind.OTHER, null));
         assertFalse(SlotRules.isBound(inventory, "PlayerOne"));
     }
+
+    @Test
+    void duplicateMembershipIsRejectedAndBatteriesAreIsolatedByOwner() {
+        UUID otherPlayer = UUID.fromString("2b77ef75-a4d9-40f8-83e4-2ac8c64f2d3a");
+        Batteries batteries = new Batteries();
+        assertTrue(batteries.add(PLAYER, "A", CANNON, 16));
+        assertFalse(batteries.add(PLAYER, "A", CANNON, 16));
+        assertTrue(batteries.add(otherPlayer, "A", CANNON, 16));
+        assertEquals(Set.of(PLAYER, otherPlayer), batteries.owners(CANNON));
+        assertFalse(batteries.remove(PLAYER, "A", new CannonId(
+                "minecraft:overworld", 9, 64, 9), 16));
+        assertEquals(Set.of(CANNON), batteries.members(PLAYER, "A"));
+        assertEquals(Set.of(CANNON), batteries.members(otherPlayer, "A"));
+    }
+
+    @Test
+    void returnedBatteryCollectionsAreSnapshotsAndCannotMutateState() {
+        Batteries batteries = new Batteries();
+        batteries.add(PLAYER, "A", CANNON, 16);
+        Set<CannonId> members = batteries.members(PLAYER, "A");
+        Map<String, Integer> listing = batteries.list(PLAYER);
+        Map<UUID, Map<String, Set<CannonId>>> snapshot = batteries.snapshot();
+        assertThrows(UnsupportedOperationException.class, () -> members.add(
+                new CannonId("minecraft:the_nether", 1, 2, 3)));
+        assertThrows(UnsupportedOperationException.class, () -> listing.put("B", 1));
+        assertThrows(UnsupportedOperationException.class,
+                () -> snapshot.get(PLAYER).put("B", Set.of(CANNON)));
+        assertEquals(Map.of("A", 1), batteries.list(PLAYER));
+    }
+
+    @Test
+    void everySlotBoundaryAndInvalidIndexMatchesTheCannonContract() {
+        SlotRules.Item tnt = new SlotRules.Item(SlotRules.ItemKind.TNT, null);
+        SlotRules.Item named = new SlotRules.Item(SlotRules.ItemKind.OTHER, "bound");
+        SlotRules.Item emerald = new SlotRules.Item(SlotRules.ItemKind.EMERALD, null);
+        for (int slot = 0; slot < 18; slot++) {
+            assertTrue(SlotRules.accepts(slot, tnt), "TNT slot " + slot);
+            assertFalse(SlotRules.accepts(slot, emerald), "emerald in ammo slot " + slot);
+        }
+        for (int slot = 18; slot < 26; slot++) {
+            assertTrue(SlotRules.accepts(slot, named), "binding slot " + slot);
+            assertFalse(SlotRules.accepts(slot, tnt), "TNT in binding slot " + slot);
+        }
+        assertTrue(SlotRules.accepts(26, emerald));
+        assertFalse(SlotRules.accepts(26, named));
+        assertFalse(SlotRules.accepts(-1, tnt));
+        assertFalse(SlotRules.accepts(27, tnt));
+        assertFalse(SlotRules.accepts(26, null));
+    }
+
+    @Test
+    void bindingsOnlyReadSlotsEighteenThroughTwentyFiveAndShortInventoriesAreSafe() {
+        List<SlotRules.Item> inventory = new ArrayList<>(java.util.Collections.nCopies(27, null));
+        inventory.set(17, new SlotRules.Item(SlotRules.ItemKind.OTHER, "PlayerOne"));
+        assertFalse(SlotRules.isBound(inventory, "PlayerOne"));
+        inventory.set(25, new SlotRules.Item(SlotRules.ItemKind.OTHER, "PlayerOne"));
+        assertTrue(SlotRules.isBound(inventory, "PlayerOne"));
+        assertFalse(SlotRules.isBound(inventory.subList(0, 20), "PlayerOne"));
+        assertFalse(SlotRules.isBound(inventory, "playerone"));
+    }
 }

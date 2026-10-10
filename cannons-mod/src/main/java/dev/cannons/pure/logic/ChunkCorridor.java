@@ -14,13 +14,53 @@ public final class ChunkCorridor {
         if (!Double.isFinite(padding) || padding < 0) {
             throw new IllegalArgumentException("padding must be finite and non-negative");
         }
-        int minChunkX = floorChunkLower(Math.min(start.x(), end.x()) - padding);
-        int maxChunkX = floorChunk(Math.max(start.x(), end.x()) + padding);
-        int minChunkZ = floorChunkLower(Math.min(start.z(), end.z()) - padding);
-        int maxChunkZ = floorChunk(Math.max(start.z(), end.z()) + padding);
+        if (!Double.isFinite(start.x()) || !Double.isFinite(start.z())
+                || !Double.isFinite(end.x()) || !Double.isFinite(end.z())) {
+            throw new IllegalArgumentException("horizontal coordinates must be finite");
+        }
+
+        double deltaX = end.x() - start.x();
+        double deltaZ = end.z() - start.z();
+        boolean xIsMajor = Math.abs(deltaX) >= Math.abs(deltaZ);
+        double majorStart = xIsMajor ? start.x() : start.z();
+        double majorEnd = xIsMajor ? end.x() : end.z();
+        double minorStart = xIsMajor ? start.z() : start.x();
+        double minorEnd = xIsMajor ? end.z() : end.x();
+        double majorDelta = majorEnd - majorStart;
+        double minorDelta = minorEnd - minorStart;
+        int minMajorChunk = floorChunkLower(Math.min(majorStart, majorEnd) - padding);
+        int maxMajorChunk = floorChunk(Math.max(majorStart, majorEnd) + padding);
         Set<ChunkPos> result = new HashSet<>();
-        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
-            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+        for (int majorChunk = minMajorChunk; majorChunk <= maxMajorChunk; majorChunk++) {
+            double lowMajor = majorChunk * 16.0;
+            double highMajor = lowMajor + 16;
+            double firstParameter;
+            double lastParameter;
+            if (majorDelta == 0) {
+                if (majorStart < lowMajor - padding || majorStart > highMajor + padding) {
+                    continue;
+                }
+                firstParameter = 0;
+                lastParameter = 1;
+            } else {
+                double parameterA = (lowMajor - padding - majorStart) / majorDelta;
+                double parameterB = (highMajor + padding - majorStart) / majorDelta;
+                firstParameter = Math.max(0, Math.min(parameterA, parameterB));
+                lastParameter = Math.min(1, Math.max(parameterA, parameterB));
+                if (firstParameter > lastParameter) {
+                    continue;
+                }
+            }
+            double minorAtFirst = minorStart + minorDelta * firstParameter;
+            double minorAtLast = minorStart + minorDelta * lastParameter;
+            int minMinorChunk = floorChunkLower(
+                    Math.min(minorAtFirst, minorAtLast) - padding);
+            int maxMinorChunk = floorChunk(
+                    Math.max(minorAtFirst, minorAtLast) + padding);
+
+            for (int minorChunk = minMinorChunk; minorChunk <= maxMinorChunk; minorChunk++) {
+                int chunkX = xIsMajor ? majorChunk : minorChunk;
+                int chunkZ = xIsMajor ? minorChunk : majorChunk;
                 double lowX = chunkX * 16.0;
                 double lowZ = chunkZ * 16.0;
                 double highX = lowX + 16;

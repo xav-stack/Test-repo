@@ -74,6 +74,17 @@ public final class ArcPath {
         return pointAtParameter(parameter);
     }
 
+    public double distanceAtParameter(double parameter) {
+        double t = Math.max(0, Math.min(1, parameter));
+        if (t == 1) {
+            return totalLength;
+        }
+        double scaled = t * TABLE_SEGMENTS;
+        int lower = (int) scaled;
+        double fraction = scaled - lower;
+        return lengths[lower] + (lengths[lower + 1] - lengths[lower]) * fraction;
+    }
+
     public Vec3 pointAtFraction(double fraction) {
         return pointAtDistance(Math.max(0, Math.min(1, fraction)) * totalLength);
     }

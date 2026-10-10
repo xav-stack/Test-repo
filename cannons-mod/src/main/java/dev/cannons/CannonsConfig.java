@@ -49,7 +49,7 @@ public final class CannonsConfig {
         return config;
     }
 
-    private void validate() {
+    void validate() {
         projectileSpeedBlocksPerSecond = clamp("projectileSpeedBlocksPerSecond",
                 projectileSpeedBlocksPerSecond, 0.1, 1000);
         refusalRadiusBlocks = clamp("refusalRadiusBlocks", refusalRadiusBlocks, 0, 512);
@@ -59,7 +59,7 @@ public final class CannonsConfig {
         lookRangeBlocks = clamp("lookRangeBlocks", lookRangeBlocks, 0.5, 32);
         maxRpm = clamp("maxRpm", maxRpm, 1, 60);
         arcHeightRatio = clamp("arcHeightRatio", arcHeightRatio, 0, 10);
-        collisionSubstepBlocks = clamp("collisionSubstepBlocks", collisionSubstepBlocks, 0.05, 2);
+        collisionSubstepBlocks = clamp("collisionSubstepBlocks", collisionSubstepBlocks, 0.05, 0.98);
         chunkWaitTimeoutTicks = clamp("chunkWaitTimeoutTicks", chunkWaitTimeoutTicks, 1, 1200);
         noticeThrottleSeconds = clamp("noticeThrottleSeconds", noticeThrottleSeconds, 0, 60);
         batteryNameMaxLength = clamp("batteryNameMaxLength", batteryNameMaxLength, 1, 16);

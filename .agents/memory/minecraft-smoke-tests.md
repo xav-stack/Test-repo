@@ -26,3 +26,9 @@ Repeated restarts of the persisted smoke-test world stalled during spawn prepara
 **Why:** Reusing a saved test world can make a server-startup stall look like a mod failure and block follow-up verification.
 
 **How to apply:** Preserve the original test world and use an isolated fresh copy when repeating instrumented shots.
+
+Temporary Mineflayer harnesses outside the pnpm package can resolve Mineflayer itself through `NODE_PATH` while failing to resolve its transitive modules directly.
+
+**Why:** Node resolves imports relative to the calling file, while pnpm keeps package dependencies nested in its store.
+
+**How to apply:** Resolve transitive modules from Mineflayer's installed package location, and remove temporary test-only dependencies after the harness run.

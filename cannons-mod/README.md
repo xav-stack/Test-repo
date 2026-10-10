@@ -30,7 +30,7 @@ The server creates `config/cannons.json` on first start. Invalid values are clam
 | `lookRangeBlocks` | 5 | Maximum command raycast distance to select a cannon. |
 | `maxRpm` | 60 | Maximum emerald-count firing rate. |
 | `arcHeightRatio` | 0.25 | Arc rise as a fraction of straight-line distance. |
-| `collisionSubstepBlocks` | 0.25 | Maximum projectile collision-sweep step. |
+| `collisionSubstepBlocks` | 0.25 | Maximum projectile collision-sweep step; values above 0.98 are clamped to prevent tunneling through one-block obstacles. |
 | `chunkWaitTimeoutTicks` | 200 | Maximum wait for an unloaded corridor chunk before abandoning a shot. |
 | `noticeThrottleSeconds` | 1 | Minimum interval for grouped blocked-shot action-bar notices. |
 | `batteryNameMaxLength` | 16 | Maximum length of a battery name. |

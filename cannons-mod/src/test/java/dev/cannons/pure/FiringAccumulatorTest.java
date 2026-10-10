@@ -58,4 +58,41 @@ class FiringAccumulatorTest {
         assertFalse(FiringAccumulator.hasShotDueWithin(true, 0, 1_200, 60, 1_800));
         assertFalse(FiringAccumulator.hasShotDueWithin(false, 1, 1_200, 60, 1_800));
     }
+
+    @Test
+    void startAndStopResetProgressAndAWaitingAttemptPausesExactlyAtTheThreshold() {
+        FiringAccumulator accumulator = new FiringAccumulator();
+        accumulator.start();
+        accumulator.tick(17);
+        accumulator.start();
+        assertEquals(FiringAccumulator.SHOT_INTERVAL, accumulator.progress());
+        assertTrue(accumulator.isShotDue());
+        accumulator.resolveAttempt(true);
+        assertEquals(FiringAccumulator.SHOT_INTERVAL, accumulator.progress());
+        accumulator.resolveAttempt(false);
+        assertEquals(0, accumulator.progress());
+
+        accumulator.tick(60);
+        accumulator.stop();
+        assertEquals(0, accumulator.progress());
+        assertFalse(accumulator.isShotDue());
+        accumulator.tick(1);
+        assertEquals(1, accumulator.progress());
+    }
+
+    @Test
+    void rpmSixtyFiresOnTheTwentiethTickAndNoMoreThanOneShotPerTick() {
+        FiringAccumulator accumulator = new FiringAccumulator();
+        accumulator.start();
+        accumulator.resolveAttempt(false);
+        int shots = 0;
+        for (int tick = 1; tick <= 40; tick++) {
+            if (accumulator.tick(60)) {
+                shots++;
+                accumulator.resolveAttempt(false);
+            }
+            assertEquals(tick / 20, shots);
+        }
+        assertEquals(0, accumulator.progress());
+    }
 }

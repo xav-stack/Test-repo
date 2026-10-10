@@ -41,8 +41,12 @@ public final class BatteriesState extends PersistentState {
                 NbtList members = battery.getList("Members", NbtElement.COMPOUND_TYPE);
                 for (int c = 0; c < members.size(); c++) {
                     NbtCompound member = members.getCompound(c);
+                    String dimension = member.getString("Dimension");
+                    if (dimension.isBlank()) {
+                        continue;
+                    }
                     state.batteries.add(playerId, name, new CannonId(
-                            member.getString("Dimension"),
+                            dimension,
                             member.getInt("X"),
                             member.getInt("Y"),
                             member.getInt("Z")

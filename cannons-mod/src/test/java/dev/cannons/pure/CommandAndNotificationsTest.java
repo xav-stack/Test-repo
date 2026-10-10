@@ -42,6 +42,24 @@ class CommandAndNotificationsTest {
     }
 
     @Test
+    void coordinateBoundsAreInclusiveExceptForTheExclusiveTopBuildHeight() {
+        assertTrue(CommandCoordinates.areValid(-100, -64, 100,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(-100.0001, 64, 0,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(100.0001, 64, 0,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(0, 64, -100.0001,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(0, 64, 100.0001,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(0, -64.0001, 0,
+                -100, 100, -100, 100, -64, 320));
+        assertFalse(CommandCoordinates.areValid(0, Double.NEGATIVE_INFINITY, 0,
+                -100, 100, -100, 100, -64, 320));
+    }
+
+    @Test
     void blockedNoticesThrottleAndAggregateCounts() {
         BlockedNoticeThrottle throttle = new BlockedNoticeThrottle();
         throttle.record(STARTER);
@@ -61,5 +79,17 @@ class CommandAndNotificationsTest {
         assertEquals(1, notices.get(STARTER).count());
         assertEquals(cannon, notices.get(STARTER).onlyCannon());
         assertTrue(aggregator.drainTick().isEmpty());
+    }
+
+    @Test
+    void blockedNoticeThrottleSeparatesStartersAndZeroDelayFlushesImmediately() {
+        BlockedNoticeThrottle throttle = new BlockedNoticeThrottle();
+        UUID secondStarter = UUID.fromString("a54d2202-f9ae-4a6b-a717-4e8c92e0ce66");
+        throttle.record(STARTER);
+        throttle.record(secondStarter);
+        assertEquals(Map.of(STARTER, 1, secondStarter, 1),
+                throttle.flushReady(0, 0));
+        throttle.record(STARTER);
+        assertEquals(Map.of(STARTER, 1), throttle.flushReady(1, 0));
     }
 }
