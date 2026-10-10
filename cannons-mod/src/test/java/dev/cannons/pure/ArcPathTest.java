@@ -74,4 +74,35 @@ class ArcPathTest {
         assertEquals(path.start(), path.pointAtFraction(-1));
         assertEquals(path.end(), path.pointAtFraction(2));
     }
+
+    @Test
+    void aboveHeightIntervalReportsBothExactArcIntersections() {
+        ArcPath path = new ArcPath(new Vec3(0, 64, 0), new Vec3(100, 64, 0), 0.25);
+
+        ArcPath.AboveHeightInterval interval = path.intervalAbove(80);
+
+        assertNotNull(interval);
+        assertTrue(interval.startParameter() > 0 && interval.startParameter() < 0.5);
+        assertTrue(interval.endParameter() > 0.5 && interval.endParameter() < 1);
+        assertEquals(80, interval.startPoint().y(), 1e-10);
+        assertEquals(80, interval.endPoint().y(), 1e-10);
+        assertEquals(interval.startParameter(),
+                1 - interval.endParameter(), 1e-10);
+        assertTrue(interval.endDistance() > interval.startDistance());
+    }
+
+    @Test
+    void aboveHeightIntervalHandlesStartAboveAndNoCrossing() {
+        ArcPath startsAbove = new ArcPath(new Vec3(0, 20, 0), new Vec3(40, 0, 0), 0.1);
+        ArcPath entirelyBelow = new ArcPath(new Vec3(0, 0, 0), new Vec3(40, 5, 0), 0.1);
+        ArcPath tangent = new ArcPath(new Vec3(0, 0, 0), new Vec3(40, 0, 0), 0.25);
+
+        ArcPath.AboveHeightInterval interval = startsAbove.intervalAbove(10);
+
+        assertNotNull(interval);
+        assertEquals(0, interval.startDistance());
+        assertEquals(10, interval.endPoint().y(), 1e-10);
+        assertNull(entirelyBelow.intervalAbove(20));
+        assertNull(tangent.intervalAbove(10));
+    }
 }
